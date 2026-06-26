@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+
+  eureka:
+    image: ghcr.io/amphorous/delphi:latest
+    environment:
+      - EUREKA_INSTANCE_HOSTNAME=eureka
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  aquila:
+    image: ghcr.io/amphorous/aquila:latest
+    depends_on:
+      eureka:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+
+  celestia:
+    image: ghcr.io/amphorous/celestia:latest
+    depends_on:
+      eureka:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+
+  translator:
+    image: ghcr.io/amphorous/translator:latest
+    depends_on:
+      eureka:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+
+  frontend:
+    image: ghcr.io/amphorous/remuria-frontend:latest
+    depends_on:
+      - aquila
+    ports:
+      - "80:80"
