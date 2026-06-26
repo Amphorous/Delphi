@@ -35,6 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Docker ###
+.env
 /gradle/
 /gradlew
 /gradlew.bat
