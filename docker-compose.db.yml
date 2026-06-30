@@ -18,6 +18,11 @@ services:
     command: ["--replSet", "rs0", "--bind_ip_all"]
     volumes:
       - mongo-arbiter-data:/data/db
+    ports:
+      # Published on a distinct host port since mongo-orexis already owns 27017
+      # on this host. Must be LAN-reachable - philia's mongod needs to heartbeat
+      # this member too, not just orexis's own containers.
+      - "27018:27017"
     depends_on:
       mongo-orexis:
         condition: service_healthy
@@ -42,9 +47,9 @@ services:
             rs.initiate({
               _id: 'rs0',
               members: [
-                { _id: 0, host: 'mongo-orexis:27017', priority: 2 },
-                { _id: 1, host: 'mongo-philia:27017', priority: 1 },
-                { _id: 2, host: 'mongo-arbiter:27017', arbiterOnly: true }
+                { _id: 0, host: '${OREXIS_LAN_HOST}:27017', priority: 2 },
+                { _id: 1, host: '${PHILIA_LAN_HOST}:27017', priority: 1 },
+                { _id: 2, host: '${OREXIS_LAN_HOST}:27018', arbiterOnly: true }
               ]
             });
           }
