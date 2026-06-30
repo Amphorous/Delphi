@@ -22,7 +22,7 @@ Bring up the DB containers alongside the app stack on orexis. The replica set is
 docker compose -f docker-compose.yml -f docker-compose.db.yml up -d
 ```
 
-Optionally, when philia is powered on, bring up its secondary/standby containers. `mongo-rs-join` connects to orexis's primary and adds philia to the replica set (idempotent - safe to run every time philia comes back online):
+Optionally, when philia is powered on, bring up its secondary/standby containers (see "First-time setup on Philia" below for the full sequence). `mongo-rs-join` connects to orexis's primary and adds philia to the replica set (idempotent - safe to run every time philia comes back online):
 ```bash
 docker compose -f docker-compose.db.philia.yml --env-file .env.philia up -d
 ```
@@ -96,16 +96,54 @@ docker compose logs frontend
 docker compose logs -f celestia
 ```
 
-## Running extra capacity on Philia
+## First-time setup on Philia
 
-When you want extra request-handling capacity and philia happens to be on, run additional instances of celestia/aquila/translator there. They register with orexis's Eureka under the same service names, so Aquila's existing `lb://` routing load-balances across orexis's instances and philia's automatically — no gateway changes needed.
+On philia (a separate clone of this repo from orexis's):
 
 ```bash
-cp .env.philia.example .env.philia   # fill in OREXIS_LAN_HOST and the shared secrets
+git clone https://github.com/Amphorous/Delphi.git
+cd Delphi
+cp .env.philia.example .env.philia
+nano .env.philia    # fill in OREXIS_LAN_HOST, PHILIA_LAN_HOST, and the shared secrets (must match orexis's .env)
+```
+
+### DB standby (Mongo secondary, Redis replica, Neo4j cold-standby)
+
+Bring these up every time philia is on - they keep the replica set redundant. `mongo-rs-join` is idempotent (safe to run every time):
+
+```bash
+docker compose -f docker-compose.db.philia.yml --env-file .env.philia pull
+docker compose -f docker-compose.db.philia.yml --env-file .env.philia up -d
+docker compose -f docker-compose.db.philia.yml --env-file .env.philia logs mongo-rs-join
+```
+
+You should see `philia added to replica set.` (or `philia is already a member, skipping.` on subsequent runs). Confirm from orexis:
+
+```bash
+docker compose exec mongo-orexis mongosh --eval "rs.status()"
+```
+
+`mongo-philia` should show up as `SECONDARY`.
+
+Stop the DB standby containers:
+
+```bash
+docker compose -f docker-compose.db.philia.yml --env-file .env.philia down
+```
+
+### Extra load-bearing app instances (celestia, aquila, translator)
+
+Separate, deliberate step - only run this when you actually want philia contributing extra request-handling capacity. These register with orexis's Eureka under the same service names, so Aquila's existing `lb://` routing load-balances across orexis's instances and philia's automatically — no gateway changes needed.
+
+```bash
+docker login ghcr.io -u Amphorous --password-stdin   # private images, needed here too
+docker compose -f docker-compose.philia.yml --env-file .env.philia pull
 docker compose -f docker-compose.philia.yml --env-file .env.philia up -d
 ```
 
-These instances use a shortened Eureka lease (~15-20s eviction) so Aquila stops routing to them quickly if philia disappears ungracefully; its existing Retry + CircuitBreaker filters absorb the brief window before that. Stop them with:
+These instances use a shortened Eureka lease (~15-20s eviction) so Aquila stops routing to them quickly if philia disappears ungracefully; its existing Retry + CircuitBreaker filters absorb the brief window before that.
+
+Stop them:
 
 ```bash
 docker compose -f docker-compose.philia.yml --env-file .env.philia down
