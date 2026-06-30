@@ -3,8 +3,11 @@ services:
   aquila-philia:
     image: ghcr.io/amphorous/aquila:latest
     env_file: .env.philia
+    ports:
+      - "8080:8080"
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://${OREXIS_LAN_HOST}:8761/eureka/
+      - EUREKA_INSTANCE_HOSTNAME=${PHILIA_LAN_HOST}
       - EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=5
       - EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS=15
       - SPRING_DATA_REDIS_HOST=${OREXIS_LAN_HOST}
@@ -12,8 +15,11 @@ services:
   celestia-philia:
     image: ghcr.io/amphorous/celestia:latest
     env_file: .env.philia
+    ports:
+      - "8081:8081"
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://${OREXIS_LAN_HOST}:8761/eureka/
+      - EUREKA_INSTANCE_HOSTNAME=${PHILIA_LAN_HOST}
       - EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=5
       - EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS=15
       - SPRING_DATA_MONGODB_HOST=${OREXIS_LAN_HOST}
@@ -24,8 +30,11 @@ services:
   translator-philia:
     image: ghcr.io/amphorous/translator:latest
     env_file: .env.philia
+    ports:
+      - "8082:8082"
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://${OREXIS_LAN_HOST}:8761/eureka/
+      - EUREKA_INSTANCE_HOSTNAME=${PHILIA_LAN_HOST}
       - EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=5
       - EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS=15
       - SPRING_DATA_REDIS_HOST=${OREXIS_LAN_HOST}
