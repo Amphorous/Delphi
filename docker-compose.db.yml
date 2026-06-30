@@ -1,0 +1,104 @@
+services:
+
+  mongo-orexis:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-orexis-data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-arbiter:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-arbiter-data:/data/db
+    depends_on:
+      mongo-orexis:
+        condition: service_healthy
+
+  mongo-rs-init:
+    image: mongo:7
+    depends_on:
+      mongo-orexis:
+        condition: service_healthy
+      mongo-arbiter:
+        condition: service_started
+    restart: "no"
+    entrypoint:
+      - bash
+      - -c
+      - |
+        sleep 5
+        mongosh --host mongo-orexis --quiet --eval "
+          if (rs.status().ok) {
+            print('Replica set already initialized, skipping.');
+          } else {
+            rs.initiate({
+              _id: 'rs0',
+              members: [
+                { _id: 0, host: 'mongo-orexis:27017', priority: 2 },
+                { _id: 1, host: 'mongo-philia:27017', priority: 1 },
+                { _id: 2, host: 'mongo-arbiter:27017', arbiterOnly: true }
+              ]
+            });
+          }
+        " || true
+
+  neo4j-orexis:
+    image: neo4j:5-community
+    environment:
+      - NEO4J_AUTH=neo4j/${SPRING_DATA_NEO4J_AUTHENTICATION_PASSWORD}
+    volumes:
+      - neo4j-orexis-data:/data
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j-init-constraints:
+    image: neo4j:5-community
+    depends_on:
+      neo4j-orexis:
+        condition: service_healthy
+    environment:
+      - NEO4J_PASSWORD=${SPRING_DATA_NEO4J_AUTHENTICATION_PASSWORD}
+    volumes:
+      - ./neo4j/init:/init-scripts:ro
+    restart: "no"
+    entrypoint:
+      - bash
+      - -c
+      - |
+        for f in /init-scripts/*.cypher; do
+          echo "Applying $$f...";
+          cat "$$f" | cypher-shell -a bolt://neo4j-orexis:7687 -u neo4j -p "$$NEO4J_PASSWORD" || exit 1;
+        done
+
+  redis-orexis:
+    image: valkey/valkey:8
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - redis-orexis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo-orexis-data:
+  mongo-arbiter-data:
+  neo4j-orexis-data:
+  redis-orexis-data:

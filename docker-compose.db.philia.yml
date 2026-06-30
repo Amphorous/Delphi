@@ -1,0 +1,39 @@
+services:
+
+  mongo-philia:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-philia-data:/data/db
+    ports:
+      - "27017:27017"
+    # Joins rs0 automatically once reachable from orexis - it was already
+    # declared as a member by mongo-rs-init's rs.initiate() call. No separate
+    # init needed here; just bring this container up while orexis's stack is running.
+
+  redis-philia:
+    image: valkey/valkey:8
+    command: ["valkey-server", "--replicaof", "${OREXIS_LAN_HOST}", "6379"]
+    volumes:
+      - redis-philia-data:/data
+
+  # Neo4j on philia is NOT a live replica - Neo4j Community Edition has no
+  # clustering/causal replication. This is a cold-standby restored from
+  # orexis's scheduled dumps (see neo4j/dump.sh), not automatic failover.
+  # Restore the latest dump on demand with:
+  #   docker compose -f docker-compose.db.philia.yml exec neo4j-philia neo4j-admin database load neo4j --from-path=/dumps --overwrite-destination=true
+  neo4j-philia:
+    image: neo4j:5-community
+    environment:
+      - NEO4J_AUTH=neo4j/${SPRING_DATA_NEO4J_AUTHENTICATION_PASSWORD}
+    volumes:
+      - neo4j-philia-data:/data
+      - ./neo4j/dumps:/dumps
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+
+volumes:
+  mongo-philia-data:
+  redis-philia-data:
+  neo4j-philia-data:
