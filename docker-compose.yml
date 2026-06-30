@@ -53,6 +53,10 @@ services:
       - SPRING_DATA_MONGODB_HOST=mongo-orexis
       - SPRING_DATA_NEO4J_URI=bolt://neo4j-orexis:7687
       - SPRING_DATA_REDIS_HOST=redis-orexis
+      # Overrides the (now-fixed, but not yet rebuilt) hardcoded password in
+      # Celestia's application.properties - takes effect immediately without
+      # needing a new image build/push/pull.
+      - SPRING_NEO4J_AUTHENTICATION_PASSWORD=${SPRING_DATA_NEO4J_AUTHENTICATION_PASSWORD}
     volumes:
       - ./logs/celestia:/app/logs
 
