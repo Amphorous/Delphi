@@ -46,11 +46,10 @@ services:
               _id: 'rs0',
               members: [
                 { _id: 0, host: '${OREXIS_LAN_HOST}:27017', priority: 2 },
-                { _id: 1, host: '${PHILIA_LAN_HOST}:27017', priority: 1 },
-                { _id: 2, host: '${OREXIS_LAN_HOST}:27018', arbiterOnly: true }
+                { _id: 1, host: '${OREXIS_LAN_HOST}:27018', arbiterOnly: true }
               ]
             });
-            print('Replica set initiated.');
+            print('Replica set initiated (orexis + arbiter). Philia joins later via rs.add() - see docker-compose.db.philia.yml.');
           } catch (e) {
             if (e.codeName === 'AlreadyInitialized') {
               print('Replica set already initialized, skipping.');

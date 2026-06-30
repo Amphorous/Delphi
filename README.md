@@ -13,18 +13,18 @@ Databases run as containers on **orexis** (the always-on host), not on a separat
 
 | Database | Orexis (primary) | Philia (secondary) |
 |----------|-------------------|---------------------|
-| MongoDB | `mongo-orexis`, priority 2, plus `mongo-arbiter` (vote-only) | `mongo-philia`, priority 1 — real replica-set member, auto-syncs when reachable |
+| MongoDB | `mongo-orexis`, priority 2, plus `mongo-arbiter` (vote-only) | `mongo-philia`, priority 1 — joins dynamically via `rs.add()` when reachable |
 | Neo4j | `neo4j-orexis` | `neo4j-philia` — **cold-standby only**, restored from scheduled dumps (`neo4j/dump.sh`); Neo4j Community has no clustering, so this is not automatic failover |
 | Redis/Valkey | `redis-orexis` | `redis-philia` — read-only replica (`replicaof`), no Sentinel/failover (it's a cache, not a system of record) |
 
-Bring up the DB containers alongside the app stack on orexis:
+Bring up the DB containers alongside the app stack on orexis. The replica set is initiated with **only orexis + the arbiter** - it does not wait for or require philia to be reachable, so this works the same whether philia is on or off:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.db.yml up -d
 ```
 
-Optionally, when philia is powered on, bring up its secondary/standby containers:
+Optionally, when philia is powered on, bring up its secondary/standby containers. `mongo-rs-join` connects to orexis's primary and adds philia to the replica set (idempotent - safe to run every time philia comes back online):
 ```bash
-docker compose -f docker-compose.db.philia.yml up -d
+docker compose -f docker-compose.db.philia.yml --env-file .env.philia up -d
 ```
 
 MongoDB keeps a write majority (orexis + arbiter = 2 of 3 votes) even when philia is off — this is why orexis stays primary regardless of philia's availability. If orexis's Neo4j container is ever lost, restore the latest dump on philia and repoint `SPRING_DATA_NEO4J_URI` at it manually; this is a recovery procedure, not a seamless failover.

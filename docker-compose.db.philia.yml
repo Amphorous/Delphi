@@ -7,9 +7,37 @@ services:
       - mongo-philia-data:/data/db
     ports:
       - "27017:27017"
-    # Joins rs0 automatically once reachable from orexis - it was already
-    # declared as a member by mongo-rs-init's rs.initiate() call. No separate
-    # init needed here; just bring this container up while orexis's stack is running.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-rs-join:
+    image: mongo:7
+    depends_on:
+      mongo-philia:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      - bash
+      - -c
+      - |
+        sleep 5
+        mongosh --host ${OREXIS_LAN_HOST} --quiet --eval "
+          try {
+            var members = rs.status().members.map(m => m.name);
+            if (members.indexOf('${PHILIA_LAN_HOST}:27017') !== -1) {
+              print('philia is already a member, skipping.');
+            } else {
+              rs.add({ host: '${PHILIA_LAN_HOST}:27017', priority: 1 });
+              print('philia added to replica set.');
+            }
+          } catch (e) {
+            print('rs.add() failed: ' + e.message);
+            quit(1);
+          }
+        "
 
   redis-philia:
     image: valkey/valkey:8
