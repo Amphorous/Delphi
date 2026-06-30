@@ -6,11 +6,23 @@ services:
       - EUREKA_INSTANCE_HOSTNAME=eureka
     ports:
       - "8761:8761"
+    volumes:
+      - ./logs/eureka:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  admin:
+    image: ghcr.io/amphorous/celestia-admin:latest
+    depends_on:
+      eureka:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+    ports:
+      - "8090:8090"
 
   aquila:
     image: ghcr.io/amphorous/aquila:latest
@@ -20,24 +32,43 @@ services:
     env_file: .env
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+      - SPRING_DATA_REDIS_HOST=redis-orexis
+    volumes:
+      - ./logs/aquila:/app/logs
 
   celestia:
     image: ghcr.io/amphorous/celestia:latest
     depends_on:
       eureka:
         condition: service_healthy
+      mongo-orexis:
+        condition: service_healthy
+      neo4j-orexis:
+        condition: service_healthy
+      redis-orexis:
+        condition: service_healthy
     env_file: .env
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+      - SPRING_DATA_MONGODB_HOST=mongo-orexis
+      - SPRING_DATA_NEO4J_URI=bolt://neo4j-orexis:7687
+      - SPRING_DATA_REDIS_HOST=redis-orexis
+    volumes:
+      - ./logs/celestia:/app/logs
 
   translator:
     image: ghcr.io/amphorous/translator:latest
     depends_on:
       eureka:
         condition: service_healthy
+      redis-orexis:
+        condition: service_healthy
     env_file: .env
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+      - SPRING_DATA_REDIS_HOST=redis-orexis
+    volumes:
+      - ./logs/translator:/app/logs
 
   frontend:
     image: ghcr.io/amphorous/remuria-frontend:latest

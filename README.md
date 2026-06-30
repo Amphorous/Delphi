@@ -6,7 +6,28 @@ This repo contains the Eureka service registry and the Docker Compose orchestrat
 
 - Docker and Docker Compose installed on the host machine
 - Access to GHCR (GitHub Container Registry) — the images are private
-- Database server (Philia) running MongoDB, Neo4j, and Valkey/Redis, reachable over LAN
+
+## Database Topology
+
+Databases run as containers on **orexis** (the always-on host), not on a separate database server:
+
+| Database | Orexis (primary) | Philia (secondary) |
+|----------|-------------------|---------------------|
+| MongoDB | `mongo-orexis`, priority 2, plus `mongo-arbiter` (vote-only) | `mongo-philia`, priority 1 — real replica-set member, auto-syncs when reachable |
+| Neo4j | `neo4j-orexis` | `neo4j-philia` — **cold-standby only**, restored from scheduled dumps (`neo4j/dump.sh`); Neo4j Community has no clustering, so this is not automatic failover |
+| Redis/Valkey | `redis-orexis` | `redis-philia` — read-only replica (`replicaof`), no Sentinel/failover (it's a cache, not a system of record) |
+
+Bring up the DB containers alongside the app stack on orexis:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.db.yml up -d
+```
+
+Optionally, when philia is powered on, bring up its secondary/standby containers:
+```bash
+docker compose -f docker-compose.db.philia.yml up -d
+```
+
+MongoDB keeps a write majority (orexis + arbiter = 2 of 3 votes) even when philia is off — this is why orexis stays primary regardless of philia's availability. If orexis's Neo4j container is ever lost, restore the latest dump on philia and repoint `SPRING_DATA_NEO4J_URI` at it manually; this is a recovery procedure, not a seamless failover.
 
 ## First-time setup
 
@@ -43,13 +64,13 @@ Fill in all `CHANGE_ME` values:
 | `APPLICATION_SECURITY_GATEWAY_SIGNING_SECRET` | HMAC key for inter-service signing (must match in Aquila and Celestia) |
 | `APPLICATION_FRONTEND_URL_HSR` | Public URL of the frontend (e.g., `https://yourdomain.com` or `http://localhost:3000`) |
 
-Database hosts default to `philia.home` — change if your setup differs.
+Database hosts default to the orexis-local containers (`mongo-orexis`, `neo4j-orexis`, `redis-orexis`) defined in `docker-compose.db.yml` — see "Database Topology" above.
 
 ### 4. Pull and start
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.db.yml pull
+docker compose -f docker-compose.yml -f docker-compose.db.yml up -d
 ```
 
 ## Verifying
@@ -61,6 +82,9 @@ docker compose ps
 # Eureka dashboard (should show DELTA-ME13, AQUILA, TRANSLATOR registered)
 # Open http://<host>:8761 in a browser
 
+# Admin panel (Spring Boot Admin - per-instance log tabs, IntelliJ-style formatting)
+# Open http://<host>:8090 in a browser
+
 # Check logs for a specific service
 docker compose logs eureka
 docker compose logs celestia
@@ -70,6 +94,21 @@ docker compose logs frontend
 
 # Follow logs in real-time
 docker compose logs -f celestia
+```
+
+## Running extra capacity on Philia
+
+When you want extra request-handling capacity and philia happens to be on, run additional instances of celestia/aquila/translator there. They register with orexis's Eureka under the same service names, so Aquila's existing `lb://` routing load-balances across orexis's instances and philia's automatically — no gateway changes needed.
+
+```bash
+cp .env.philia.example .env.philia   # fill in OREXIS_LAN_HOST and the shared secrets
+docker compose -f docker-compose.philia.yml --env-file .env.philia up -d
+```
+
+These instances use a shortened Eureka lease (~15-20s eviction) so Aquila stops routing to them quickly if philia disappears ungracefully; its existing Retry + CircuitBreaker filters absorb the brief window before that. Stop them with:
+
+```bash
+docker compose -f docker-compose.philia.yml --env-file .env.philia down
 ```
 
 ## Updating
@@ -149,4 +188,4 @@ Wait 30-60 seconds after startup — services register asynchronously. Check ind
 Check that Aquila is registered in Eureka and can reach the backend services. Verify `.env` has correct database hosts.
 
 **Database connection refused:**
-Verify Philia is reachable: `ping philia.home` and check that MongoDB (27017), Neo4j (7687), and Redis (6379) ports are open.
+Verify the DB containers from `docker-compose.db.yml` are healthy: `docker compose ps mongo-orexis neo4j-orexis redis-orexis`.
