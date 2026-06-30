@@ -5,7 +5,6 @@ services:
     env_file: .env.philia
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://${OREXIS_LAN_HOST}:8761/eureka/
-      - EUREKA_INSTANCE_INSTANCE_ID=aquila:philia:${HOSTNAME}:${RANDOM}
       - EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=5
       - EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS=15
       - SPRING_DATA_REDIS_HOST=${OREXIS_LAN_HOST}
@@ -15,25 +14,19 @@ services:
     env_file: .env.philia
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://${OREXIS_LAN_HOST}:8761/eureka/
-      - EUREKA_INSTANCE_INSTANCE_ID=delta-me13:philia:${HOSTNAME}:${RANDOM}
       - EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=5
       - EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS=15
-      # Points at orexis's DB primaries, not philia's local secondary/cold-standby -
-      # Celestia doesn't set up Mongo read-preference, so avoid that complexity here.
       - SPRING_DATA_MONGODB_HOST=${OREXIS_LAN_HOST}
       - SPRING_DATA_NEO4J_URI=bolt://${OREXIS_LAN_HOST}:7687
       - SPRING_DATA_REDIS_HOST=${OREXIS_LAN_HOST}
+      - SPRING_NEO4J_AUTHENTICATION_PASSWORD=${SPRING_DATA_NEO4J_AUTHENTICATION_PASSWORD}
 
   translator-philia:
     image: ghcr.io/amphorous/translator:latest
     env_file: .env.philia
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://${OREXIS_LAN_HOST}:8761/eureka/
-      - EUREKA_INSTANCE_INSTANCE_ID=translator:philia:${HOSTNAME}:${RANDOM}
       - EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS=5
       - EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS=15
       - SPRING_DATA_REDIS_HOST=${OREXIS_LAN_HOST}
-      # Only orexis's instance drives the scheduled textmap refresh - philia's
-      # extra instance still does its (lock-guarded, hash-skipped) startup
-      # check, but never independently fires the 3-day cron job.
       - SCHEDULER_HSR_CHECKFORUPDATE=false
