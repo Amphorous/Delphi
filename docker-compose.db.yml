@@ -64,6 +64,14 @@ services:
     image: neo4j:5-community
     environment:
       - NEO4J_AUTH=neo4j/${SPRING_DATA_NEO4J_AUTHENTICATION_PASSWORD}
+      # Celestia's build-creation query (BuildNodeRepository) calls
+      # apoc.refactor.cloneNodes to clone a build/fightprop/skill-tree node -
+      # APOC isn't bundled in the base neo4j image, so it has to be requested
+      # here. The docker-entrypoint downloads the matching apoc-core jar for
+      # this exact Neo4j version on container start (needs outbound internet;
+      # cached in-container after the first pull, but not across a full
+      # recreate since only /data is a named volume below).
+      - NEO4J_PLUGINS=["apoc"]
     volumes:
       - neo4j-orexis-data:/data
     ports:

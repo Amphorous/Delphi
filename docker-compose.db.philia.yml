@@ -54,6 +54,10 @@ services:
     image: neo4j:5-community
     environment:
       - NEO4J_AUTH=neo4j/${SPRING_DATA_NEO4J_AUTHENTICATION_PASSWORD}
+      # Kept in sync with neo4j-orexis's APOC config (docker-compose.db.yml) -
+      # this instance is a cold-standby restored from orexis's dumps, and
+      # needs apoc.refactor.cloneNodes too if it's ever promoted to active.
+      - NEO4J_PLUGINS=["apoc"]
     volumes:
       - neo4j-philia-data:/data
       - ./neo4j/dumps:/dumps
