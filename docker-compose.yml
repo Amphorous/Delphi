@@ -74,6 +74,37 @@ services:
     volumes:
       - ./logs/translator:/app/logs
 
+  immercalc:
+    image: ghcr.io/amphorous/immercalc:latest
+    # Must come up last of the app services - depends on every other app
+    # container (not just the DBs) so `docker compose up` always starts it
+    # after the rest of the stack is already running, not just alongside it.
+    depends_on:
+      eureka:
+        condition: service_healthy
+      mongo-orexis:
+        condition: service_healthy
+      neo4j-orexis:
+        condition: service_healthy
+      redis-orexis:
+        condition: service_healthy
+      admin:
+        condition: service_started
+      aquila:
+        condition: service_started
+      celestia:
+        condition: service_started
+      translator:
+        condition: service_started
+    env_file: .env
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka:8761/eureka/
+      - SPRING_DATA_MONGODB_HOST=mongo-orexis
+      - SPRING_DATA_NEO4J_URI=bolt://neo4j-orexis:7687
+      - SPRING_DATA_REDIS_HOST=redis-orexis
+    volumes:
+      - ./logs/immercalc:/app/logs
+
   frontend:
     image: ghcr.io/amphorous/remuria-frontend:latest
     depends_on:
