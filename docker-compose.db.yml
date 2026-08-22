@@ -82,6 +82,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # Neo4j's entrypoint re-downloads the APOC plugin jar on every fresh
+      # container (see the NEO4J_PLUGINS comment above) - without this, the
+      # 50s default grace window (interval * retries) is too tight and
+      # Compose sometimes marks it unhealthy while it's still legitimately
+      # booting, failing celestia/immercalc's dependency gate for no reason.
+      start_period: 90s
 
   neo4j-init-constraints:
     image: neo4j:5-community
