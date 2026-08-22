@@ -79,7 +79,7 @@ docker compose -f docker-compose.yml -f docker-compose.db.yml up -d
 # Check all containers are running
 docker compose ps
 
-# Eureka dashboard (should show DELTA-ME13, AQUILA, TRANSLATOR registered)
+# Eureka dashboard (should show DELTA-ME13, AQUILA, TRANSLATOR, IMMERCALC registered)
 # Open http://<host>:8761 in a browser
 
 # Admin panel (Spring Boot Admin - per-instance log tabs, IntelliJ-style formatting)
@@ -90,6 +90,7 @@ docker compose logs eureka
 docker compose logs celestia
 docker compose logs aquila
 docker compose logs translator
+docker compose logs immercalc
 docker compose logs frontend
 
 # Follow logs in real-time
@@ -211,6 +212,7 @@ docker compose up -d
 | Aquila (gateway) | 8080 | not exposed | internal only |
 | Celestia (backend) | 8081 | not exposed | internal only |
 | Translator | 8082 | not exposed | internal only |
+| Immercalc | 8083 | not exposed | internal only |
 
 ## Troubleshooting
 
